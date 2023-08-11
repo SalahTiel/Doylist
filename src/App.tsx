@@ -1,9 +1,42 @@
 import {Logo} from './components/logo'
-import {useState} from 'react'
+import {useEffect} from 'react'
+import { Link, Outlet } from 'react-router-dom'
+import { requestAccessToken, RefreshToken, getUser} from './service/SpotifyApi'
 
-function App() {
-  let[tagsVisibility, setTagsVisibility] = useState(false)
-  let[musicsVisibility, setMusicsVisibility] = useState(false)
+export function App(){
+  useEffect(() => {
+    if(sessionStorage.getItem('loggedIn') == 'true'){
+      let refreshToken = localStorage.getItem('refreshToken')
+      if(!refreshToken){refreshToken = ''}
+      async function getTokenByRefresh(refreshAsparameter : string){
+          let response = await RefreshToken(refreshAsparameter)
+          localStorage.setItem('accessToken', response.access_token)
+      }
+      getTokenByRefresh(refreshToken)
+    }else{
+    //REQUEST THE TOKEN ACCSESS USING A AUTHORIZATION CODE
+      async function getToken () {
+        //get the authorization code:
+        let code =  new URLSearchParams(document.location.search).get('code')
+        //Typescript need to check if the value of 'code' is null and set to an empty string instead:
+        if (!code) {code = '';}
+        let response = await requestAccessToken(code)
+        localStorage.setItem('accessToken', response.access_token)
+        localStorage.setItem('refreshToken', response.refresh_token)
+      }
+      getToken()
+    }
+    //GET USER INFORMATIONS
+    let token = localStorage.getItem('accessToken')
+    if (!token){token = ''}
+    async function getUserData(tokenAsParameter: string){
+      let response = await getUser(tokenAsParameter)
+      sessionStorage.setItem('display name', response.display_name)
+      sessionStorage.setItem('userId', response.id)
+    }
+    getUserData(token)
+  }, [])
+
 
   return (
     
@@ -11,6 +44,10 @@ function App() {
         {/*HEADER*/}
         <header className="header">
             <Logo/>
+            <nav className="nav-sections">
+              <Link to="home">HOME</Link>
+              <Link to="spotify">SPOTIFY</Link>
+            </nav>
             <div className="header-nav">
               <p className='header-nav-help'>help</p>
               <div className="header-nav-toggleTheme">
@@ -20,46 +57,8 @@ function App() {
             </div>
         </header>
         <main>
-          {/*PLAYLIST AND TAGS WINDOWNS*/}
-          <div className="musicList">
-            <div className='musicList-tags'>
-              <div className="musicList-tags-title">
-                <p>TAGS</p>
-                <button onClick={()=>{setTagsVisibility(!tagsVisibility)}}>edit</button>
-              </div>
-            </div>
-
-            <div className="musicList-musics">
-              <div className="musicList-musics-title">
-                <p>YOUR MUSICS</p>
-                <button onClick={()=>{setMusicsVisibility(!musicsVisibility)}}>edit</button>
-              </div>
-            </div>
-          </div>
-
-          {/*TAGS WINDOW*/}
-          <div className={`tags ${tagsVisibility ? null : 'closed'}`}>
-              <div className='tags-header'>
-                <p>TAGS</p>
-                <button onClick={()=>{setTagsVisibility(!tagsVisibility)}}>close</button>
-              </div>
-              <form className='tags-newTag'>
-                <label htmlFor="">New tag</label>
-                <input type="text"/>
-                <input type="color"/>
-              </form>
-            </div>
-
-            {/*MUSICS WINDOW*/}
-            <div className={`musics ${musicsVisibility ? null : 'closed'}`}>
-              <div className='musics-header'>
-                <p>MUSICS</p>
-                <button onClick={()=>{setMusicsVisibility(!musicsVisibility)}}>close</button>
-              </div>
-            </div>
+          <Outlet/>
         </main>
       </div>
   )
 }
-
-export default App
